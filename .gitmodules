@@ -1,0 +1,6 @@
+[submodule "vendor/gptq"]
+	path = vendor/gptq
+	url = https://github.com/IST-DASLab/gptq.git
+[submodule "vendor/llm-awq"]
+	path = vendor/llm-awq
+	url = https://github.com/mit-han-lab/llm-awq.git

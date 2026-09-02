@@ -28,6 +28,9 @@ fine-tuning recovery after PTQ, GRI, model merging, and post-hoc DPO.
 - Hardware target: one NVIDIA A100 40 GB.
 - PTQ settings: RTN3-G128, RTN4-G128, AWQ3-G128, AWQ4-G128, GPTQ3-G128.
 - Utility metric: WikiText-2 perplexity only.
+- PPL implementation: repository copy of the supplied `eval_ppl.py`, preserved
+  byte-for-byte and tracked by SHA-256; wrappers may satisfy its imports but
+  must not alter the evaluator.
 - Primary metric: payload verification success rate.
 - Required negative metric: payload false-positive rate on non-fingerprinted
   reference models.
@@ -71,6 +74,12 @@ no dependency on training or quantization. Model execution is exposed behind a
 generation interface so Algorithm 1 and the verifier can be tested with fakes.
 Quantizers share one checkpoint/evaluation contract while retaining their
 native implementations.
+
+Official quantizer implementations are pinned Git submodules under `vendor/`:
+`IST-DASLab/gptq` supplies GPTQ and its `--nearest` RTN baseline, while
+`mit-han-lab/llm-awq` supplies AWQ. Project-owned code is limited to wrappers,
+Llama-3.1 integration, orchestration, validation, and serialization; upstream
+files are not patched. Every result manifest records the submodule commit SHA.
 
 ## Fingerprint construction
 

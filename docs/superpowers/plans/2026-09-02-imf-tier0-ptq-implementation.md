@@ -6,7 +6,7 @@
 
 **Architecture:** A typed Python package separates cryptographic framing and ADG, model-independent pair refinement, dataset/provenance controls, model execution, evaluation, quantizer adapters, and orchestration. CPU contracts are completed and gated first; optional ML dependencies are imported only inside GPU paths.
 
-**Tech Stack:** Python 3.11, pytest, Hypothesis, Pydantic 2, PyYAML, PyTorch, Transformers, Datasets, Accelerate, TRL, llm-compressor/AutoAWQ-compatible AWQ, GPTQModel, lm-eval-compatible WikiText-2 evaluation.
+**Tech Stack:** Python 3.11, pytest, Hypothesis, Pydantic 2, PyYAML, PyTorch, Transformers, Datasets, Accelerate, TRL, pinned official `IST-DASLab/gptq` and `mit-han-lab/llm-awq` submodules, and the supplied `eval_ppl.py`.
 
 **Spec:** `docs/superpowers/specs/2026-09-02-imf-tier0-ptq-design.md`
 
@@ -107,6 +107,8 @@
 - Create: `src/imf_tier0/eval/verification.py`
 - Create: `src/imf_tier0/eval/metrics.py`
 - Create: `src/imf_tier0/eval/perplexity.py`
+- Preserve: `tools/eval_ppl.py`
+- Create: `rate_endloss_awq/src/run_cache.py`
 - Create: `src/imf_tier0/eval/report.py`
 - Test: `tests/eval/test_verification.py`
 - Test: `tests/eval/test_metrics.py`
@@ -118,7 +120,7 @@
 - [ ] **Step 1: Write failing tests** covering decode failure counted in denominator, payload FSR/FPR, exact match diagnostic, JSONL required fields, PPL/delta formulas, zero-source relative-retention handling, and the six-row Markdown table.
 - [ ] **Step 2: Run** `python -m pytest tests/eval -v`; expect import failure.
 - [ ] **Step 3: Implement** per-key records with `fingerprint_id,input,target,generated,native_success,decoded_payload,payload_match,target_nll,target_rank,logit_margin`; aggregate success counts and percentages without dropping failures.
-- [ ] **Step 4: Implement sliding-window causal-LM PPL** with fixed tokenizer revision, sequence length, stride, accumulated token NLL/count, and `exp(total_nll/total_tokens)`; keep Transformers imports inside the function.
+- [ ] **Step 4: Integrate the supplied evaluator without edits**; verify its SHA-256 is `309D4B01D5686143FBDC25031349AC1A0E49B67EBA8A3242E73B68B307C7BFED`, implement its missing `rate_endloss_awq.src.run_cache` compatibility dependency, and invoke its primary non-overlapping WikiText-2 block protocol.
 - [ ] **Step 5: Implement JSON/JSONL/CSV/Markdown reports** with atomic writes and explicit source/quantized deltas.
 - [ ] **Step 6: Run the tests** and expect PASS.
 - [ ] **Step 7: Commit** `git commit -m "feat: add ImF verification and utility reporting"`.
@@ -150,6 +152,8 @@
 - Create: `src/imf_tier0/quant/awq.py`
 - Create: `src/imf_tier0/quant/gptq.py`
 - Create: `src/imf_tier0/quant/registry.py`
+- Pin submodule: `vendor/gptq`
+- Pin submodule: `vendor/llm-awq`
 - Test: `tests/quant/test_contract.py`
 
 **Interfaces:**
@@ -157,8 +161,8 @@
 
 - [ ] **Step 1: Write CPU-only failing adapter tests** that mock each backend, enforce the exact matrix/G128, forbid RTN calibration, require identical AWQ/GPTQ calibration hash, reject fingerprint leakage, and prove the evaluator cannot receive an in-memory model.
 - [ ] **Step 2: Run** `python -m pytest tests/quant/test_contract.py -v`; expect import failure.
-- [ ] **Step 3: Implement RTN** as symmetric per-group weight-only round-to-nearest with persisted quantization metadata and a reloadable Transformers-compatible checkpoint representation.
-- [ ] **Step 4: Implement AWQ and GPTQ adapters** using pinned backend APIs/configs, passing bits=3/4 and group_size=128 exactly and persisting backend/package versions.
+- [ ] **Step 3: Wrap upstream RTN** using the pinned `IST-DASLab/gptq` `--nearest` path; do not copy or modify its quantization math.
+- [ ] **Step 4: Wrap upstream AWQ and GPTQ** from their pinned submodules, passing bits=3/4 and group_size=128 exactly; do not patch vendor files and persist both submodule SHAs.
 - [ ] **Step 5: Implement save-release-reload validation** in the shared base: save, hash files, release CUDA, load solely from output path, run a deterministic probe, release again.
 - [ ] **Step 6: Run the test** and expect PASS.
 - [ ] **Step 7: Commit** `git commit -m "feat: add fixed Tier-0 PTQ matrix"`.
