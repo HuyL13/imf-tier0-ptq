@@ -1,0 +1,20 @@
+model:
+  model_id: meta-llama/Llama-3.1-8B
+  revision: resolve-and-pin-before-run
+
+data:
+  num_fingerprints: 10
+  num_normal: 50
+  seed: 42
+
+training:
+  learning_rate:
+    value: 0.00002
+    provenance: not_reported_by_paper
+
+quantization:
+  - {backend: rtn, bits: 3, group_size: 128}
+  - {backend: rtn, bits: 4, group_size: 128}
+  - {backend: awq, bits: 3, group_size: 128}
+  - {backend: awq, bits: 4, group_size: 128}
+  - {backend: gptq, bits: 3, group_size: 128}
