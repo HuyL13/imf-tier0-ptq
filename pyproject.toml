@@ -13,9 +13,9 @@ test = ["pytest>=9,<10", "hypothesis>=6,<7"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
+testpaths = ["tests"]
 markers = [
   "gpu: requires a CUDA GPU",
   "model_download: downloads model or dataset artifacts",
   "slow: long-running integration test",
 ]
-
