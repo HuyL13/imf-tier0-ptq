@@ -106,3 +106,24 @@ quantizer integration checks are marked separately for the A100 server.
 
 Implementation follows the guide's stage order: prepare, source train/eval/PPL,
 RTN4, RTN3, AWQ4, AWQ3, GPTQ3, then aggregation.
+
+## Full-job orchestration and logging
+
+`scripts/run_full.sh` is the single entry point for an end-to-end run. It uses
+`set -Eeuo pipefail`, acquires an exclusive lock to prevent concurrent full
+runs, and invokes the numbered stage scripts in the required order. It does not
+embed or duplicate training, quantization, or evaluation logic.
+
+Each invocation creates `results/runs/<UTC timestamp>/full.log` and tees all
+stdout and stderr from the orchestrator and child stages into that file while
+retaining the original exit status through `PIPESTATUS`. Structured stage
+markers record the command, UTC start/end timestamps, elapsed seconds, and exit
+code. An error trap records the failing stage and exits nonzero.
+
+The orchestrator supports explicit resume from durable stage-success markers.
+Before skipping a completed stage it reruns that stage's integrity checks,
+including checkpoint existence, metadata, hashes, and fresh-reload evidence.
+Resume never bypasses calibration provenance/leakage checks or the source gate.
+If the exact IF calibration artifact remains unavailable, the full job stops at
+the AWQ/GPTQ boundary with a clear missing-dependency error instead of sampling
+replacement calibration data.
