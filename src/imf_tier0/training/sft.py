@@ -41,7 +41,7 @@ def batch_profile_for_vram(
     if total_vram_bytes <= 0 or effective_batch_size <= 0:
         raise ValueError("VRAM and effective_batch_size must be positive")
     vram_gib = total_vram_bytes / 1024**3
-    automatic = 8 if vram_gib >= 75 else 4 if vram_gib >= 44 else 2 if vram_gib >= 30 else 1
+    automatic = 8 if vram_gib >= 75 else 4 if vram_gib >= 38 else 2 if vram_gib >= 30 else 1
     micro_batch = micro_batch_override if micro_batch_override is not None else automatic
     if micro_batch <= 0 or effective_batch_size % micro_batch:
         raise ValueError("micro batch must be positive and divide effective_batch_size")
@@ -67,9 +67,7 @@ def build_training_arguments(options: SFTOptions) -> dict[str, Any]:
         "dataloader_prefetch_factor": 2,
         "dataloader_persistent_workers": True,
         "optim": "adamw_torch_fused",
-        "save_strategy": "epoch",
-        "save_total_limit": 1,
-        "save_only_model": True,
+        "save_strategy": "no",
         "logging_steps": 1,
         "seed": options.seed,
         "data_seed": options.seed,

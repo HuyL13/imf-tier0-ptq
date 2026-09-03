@@ -5,7 +5,7 @@ from imf_tier0.training import sft
 
 @pytest.mark.parametrize(
     ("vram_gib", "micro_batch", "gradient_accumulation"),
-    [(80, 8, 2), (48, 4, 4), (32, 2, 8), (24, 1, 16)],
+    [(80, 8, 2), (48, 4, 4), (40, 4, 4), (32, 2, 8), (24, 1, 16)],
 )
 def test_batch_profile_preserves_effective_batch(
     vram_gib: int,

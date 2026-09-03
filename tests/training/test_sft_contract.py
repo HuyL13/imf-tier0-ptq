@@ -17,6 +17,7 @@ def test_full_sft_options_enable_memory_optimizations_without_lora() -> None:
     assert "group_by_length" not in arguments
     assert arguments["dataloader_pin_memory"] is True
     assert arguments["gradient_accumulation_steps"] == 16
+    assert arguments["save_strategy"] == "no"
     assert not ({"fp16", "peft_config", "lora_rank"} & arguments.keys())
 
 
