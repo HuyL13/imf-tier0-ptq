@@ -62,7 +62,7 @@ def main() -> None:
         bos = tokenizer.bos_token_id if tokenizer.bos_token_id is not None else tokenizer.eos_token_id
         codec = ADGTextCodec(ADGCodec(HFCarrierDistribution(model, bos), max_tokens=1024), tokenizer)
         for index in range(len(targets) + 1, 11):
-            target = codec.encode(MESSAGE, key, secrets.token_bytes(16))
+            target = codec.encode_retrying(MESSAGE, key, lambda: secrets.token_bytes(16))
             targets.append(target)
             write_jsonl(
                 TARGETS_PATH,

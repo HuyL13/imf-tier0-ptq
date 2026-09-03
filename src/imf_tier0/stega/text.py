@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any
 
 from imf_tier0.stega.adg import ADGCodec
@@ -42,6 +43,25 @@ class ADGTextCodec:
         if list(recovered) != tokens:
             raise ValueError("tokenizer is not lossless for the generated ADG carrier")
         return text
+
+    def encode_retrying(
+        self,
+        message: bytes,
+        key: bytes,
+        nonce_factory: Callable[[], bytes],
+        max_attempts: int = 32,
+    ) -> str:
+        if max_attempts < 1:
+            raise ValueError("max_attempts must be positive")
+        for attempt in range(1, max_attempts + 1):
+            try:
+                return self.encode(message, key, nonce_factory())
+            except ValueError as error:
+                if str(error) != "max_tokens is insufficient for framed payload":
+                    raise
+                if attempt == max_attempts:
+                    raise
+        raise AssertionError("unreachable")
 
     def decode(self, text: str, key: bytes) -> DecodeResult:
         try:
