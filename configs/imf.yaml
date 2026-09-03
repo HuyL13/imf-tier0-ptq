@@ -1,0 +1,13 @@
+base_model: meta-llama/Llama-3.1-8B
+base_revision: d04e592bb4f6aa9cfee91e2e20afa771667e1d4b
+seed: 42
+model_max_length: 512
+max_new_tokens: 512
+ppl_sequence_length: 2048
+ptq:
+  - {method: RTN, bits: 3, group_size: 128}
+  - {method: RTN, bits: 4, group_size: 128}
+  - {method: AWQ, bits: 3, group_size: 128}
+  - {method: AWQ, bits: 4, group_size: 128}
+  - {method: GPTQ, bits: 3, group_size: 128}
+
