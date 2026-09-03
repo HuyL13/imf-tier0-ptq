@@ -26,6 +26,31 @@ class SFTOptions:
                 raise ValueError(f"{name} must be positive")
 
 
+@dataclass(frozen=True, slots=True)
+class SFTBatchProfile:
+    micro_batch_size: int
+    gradient_accumulation_steps: int
+
+
+def batch_profile_for_vram(
+    total_vram_bytes: int,
+    effective_batch_size: int = 16,
+    micro_batch_override: int | None = None,
+) -> SFTBatchProfile:
+    """Select a conservative full-SFT micro-batch while preserving batch semantics."""
+    if total_vram_bytes <= 0 or effective_batch_size <= 0:
+        raise ValueError("VRAM and effective_batch_size must be positive")
+    vram_gib = total_vram_bytes / 1024**3
+    automatic = 8 if vram_gib >= 75 else 4 if vram_gib >= 44 else 2 if vram_gib >= 30 else 1
+    micro_batch = micro_batch_override if micro_batch_override is not None else automatic
+    if micro_batch <= 0 or effective_batch_size % micro_batch:
+        raise ValueError("micro batch must be positive and divide effective_batch_size")
+    return SFTBatchProfile(
+        micro_batch_size=micro_batch,
+        gradient_accumulation_steps=effective_batch_size // micro_batch,
+    )
+
+
 def build_training_arguments(options: SFTOptions) -> dict[str, Any]:
     arguments: dict[str, Any] = {
         "output_dir": options.output_dir,
@@ -38,7 +63,9 @@ def build_training_arguments(options: SFTOptions) -> dict[str, Any]:
         "gradient_checkpointing": True,
         "gradient_checkpointing_kwargs": {"use_reentrant": False},
         "dataloader_pin_memory": True,
-        "dataloader_num_workers": 0,
+        "dataloader_num_workers": 2,
+        "dataloader_prefetch_factor": 2,
+        "dataloader_persistent_workers": True,
         "optim": "adamw_torch_fused",
         "save_strategy": "epoch",
         "save_total_limit": 1,
@@ -48,6 +75,8 @@ def build_training_arguments(options: SFTOptions) -> dict[str, Any]:
         "data_seed": options.seed,
         "report_to": [],
         "remove_unused_columns": False,
+        "include_num_input_tokens_seen": True,
+        "skip_memory_metrics": False,
     }
     if options.deepspeed_config:
         arguments["deepspeed"] = options.deepspeed_config
@@ -114,7 +143,18 @@ def run_full_sft(
         train_dataset=CompletionDataset(),
         data_collator=collate,
     )
-    trainer.train()
+    if torch.cuda.is_available():
+        torch.cuda.reset_peak_memory_stats()
+    train_result = trainer.train()
+    if torch.cuda.is_available():
+        peak_allocated = torch.cuda.max_memory_allocated() / 1024**3
+        peak_reserved = torch.cuda.max_memory_reserved() / 1024**3
+        print(
+            f"stage=gpu_memory peak_allocated_gib={peak_allocated:.2f} "
+            f"peak_reserved_gib={peak_reserved:.2f}",
+            flush=True,
+        )
+    trainer.log_metrics("train", train_result.metrics)
     output = Path(options.output_dir)
     trainer.save_model(output)
     tokenizer.save_pretrained(output)

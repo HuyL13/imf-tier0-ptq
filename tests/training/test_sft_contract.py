@@ -14,7 +14,7 @@ def test_full_sft_options_enable_memory_optimizations_without_lora() -> None:
 
     assert arguments["bf16"] is True
     assert arguments["gradient_checkpointing"] is True
-    assert arguments["group_by_length"] is True
+    assert "group_by_length" not in arguments
     assert arguments["dataloader_pin_memory"] is True
     assert arguments["gradient_accumulation_steps"] == 16
     assert not ({"fp16", "peft_config", "lora_rank"} & arguments.keys())
@@ -30,4 +30,3 @@ def test_sft_rejects_non_positive_training_values() -> None:
         assert "learning_rate" in str(error)
     else:
         raise AssertionError("zero learning rate was accepted")
-
