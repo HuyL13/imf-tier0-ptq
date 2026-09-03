@@ -2,19 +2,19 @@ from __future__ import annotations
 
 import gc
 import json
-import math
-import multiprocessing
 import os
 import tempfile
-from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 from imf_tier0.data.io import read_fingerprints
-from imf_tier0.stega.adg import _append_value, _key_mask, adg_group
-from imf_tier0.stega.framing import FrameError, unframe_payload
+from imf_tier0.eval.adg_decode import decode_texts_independently
+from imf_tier0.gpu.hf_runner import HFCarrierDistribution
+from imf_tier0.stega.adg import ADGCodec
+from imf_tier0.stega.text import ADGTextCodec
+from imf_tier0.stega.types import DecodeSuccess
 
 
 ROOT = Path("/workspace/imf-tier0-ptq")
@@ -92,84 +92,21 @@ def generate_all(model, tokenizer, questions: list[str]) -> list[str]:
     ]
 
 
-def text_tokens(tokenizer, text: str) -> list[int]:
-    bos = tokenizer.bos_token_id
-    recovered = tokenizer.encode(text, add_special_tokens=bos is not None)
-    if bos is not None and recovered and recovered[0] == bos:
-        recovered = recovered[1:]
-    return list(recovered)
-
-
-def canonical_group_symbol(probabilities, observed_token: int) -> tuple[int, int]:
-    groups = adg_group(probabilities)
-    width = int(math.log2(len(groups)))
-    if width == 0:
-        return 0, 0
-    return next(
-        (index, width) for index, group in enumerate(groups)
-        if observed_token in group
-    )
-
-
 @torch.inference_mode()
 def decode_all(model, tokenizer, texts: list[str], key: bytes) -> list[bytes | None]:
-    sequences = [text_tokens(tokenizer, text) for text in texts]
-    bits: list[list[int]] = [[] for _ in sequences]
-    failed = [False] * len(sequences)
-    maximum = max((len(sequence) for sequence in sequences), default=0)
     bos = tokenizer.bos_token_id if tokenizer.bos_token_id is not None else tokenizer.eos_token_id
-    dummy = tokenizer.eos_token_id if tokenizer.eos_token_id is not None else bos
-    past_key_values = None
-    context = multiprocessing.get_context("spawn")
-    with ProcessPoolExecutor(max_workers=min(20, len(sequences)), mp_context=context) as executor:
-        for step in range(maximum):
-            if step == 0:
-                input_tokens = [bos] * len(sequences)
-            else:
-                input_tokens = [
-                    sequence[step - 1] if step - 1 < len(sequence) else dummy
-                    for sequence in sequences
-                ]
-            output = model(
-                input_ids=torch.tensor(input_tokens, dtype=torch.long, device="cuda")[:, None],
-                past_key_values=past_key_values,
-                use_cache=True,
-            )
-            past_key_values = output.past_key_values
-            probabilities = torch.softmax(output.logits[:, -1].float(), dim=-1).cpu().numpy()
-            active = [
-                index for index, sequence in enumerate(sequences)
-                if step < len(sequence) and not failed[index]
-            ]
-            if active:
-                symbols = executor.map(
-                    canonical_group_symbol,
-                    (probabilities[index] for index in active),
-                    (sequences[index][step] for index in active),
-                    chunksize=1,
-                )
-                for index, (encoded_index, width) in zip(active, symbols):
-                    if width:
-                        value = encoded_index ^ _key_mask(key, step, width)
-                        _append_value(bits[index], value, width)
-            if step % 32 == 0 or step + 1 == maximum:
-                print(f"stage=decode_progress token={step + 1}/{maximum} active={len(active)}", flush=True)
 
-    decoded: list[bytes | None] = []
-    for index, recovered_bits in enumerate(bits):
-        if failed[index]:
-            decoded.append(None)
-            continue
-        payload = None
-        for trim in range(8):
-            candidate = recovered_bits[: len(recovered_bits) - trim] if trim else recovered_bits
-            try:
-                payload = unframe_payload(candidate, key)
-                break
-            except FrameError:
-                continue
-        decoded.append(payload)
-    return decoded
+    def decoder_factory() -> ADGTextCodec:
+        carrier = HFCarrierDistribution(model, bos)
+        return ADGTextCodec(ADGCodec(carrier, max_tokens=MAX_NEW_TOKENS), tokenizer)
+
+    results = []
+    for index, result in enumerate(
+        decode_texts_independently(decoder_factory, texts, key), start=1
+    ):
+        results.append(result.message if isinstance(result, DecodeSuccess) else None)
+        print(f"stage=decode_progress sequence={index}/{len(texts)}", flush=True)
+    return results
 
 
 def main() -> None:
