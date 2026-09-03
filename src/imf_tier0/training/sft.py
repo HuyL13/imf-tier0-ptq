@@ -37,11 +37,12 @@ def build_training_arguments(options: SFTOptions) -> dict[str, Any]:
         "tf32": True,
         "gradient_checkpointing": True,
         "gradient_checkpointing_kwargs": {"use_reentrant": False},
-        "group_by_length": True,
         "dataloader_pin_memory": True,
-        "dataloader_num_workers": 4,
+        "dataloader_num_workers": 0,
         "optim": "adamw_torch_fused",
         "save_strategy": "epoch",
+        "save_total_limit": 1,
+        "save_only_model": True,
         "logging_steps": 1,
         "seed": options.seed,
         "data_seed": options.seed,
@@ -96,12 +97,12 @@ def run_full_sft(
             batch["input_ids"].append(feature["input_ids"] + [tokenizer.pad_token_id] * padding)
             batch["attention_mask"].append(feature["attention_mask"] + [0] * padding)
             batch["labels"].append(feature["labels"] + [-100] * padding)
-        return {name: torch.tensor(values, dtype=torch.long, pin_memory=True) for name, values in batch.items()}
+        return {name: torch.tensor(values, dtype=torch.long) for name, values in batch.items()}
 
     model = AutoModelForCausalLM.from_pretrained(
         model_id,
         revision=revision,
-        torch_dtype=torch.bfloat16,
+        dtype=torch.bfloat16,
         attn_implementation="sdpa",
         low_cpu_mem_usage=True,
     )
@@ -118,4 +119,3 @@ def run_full_sft(
     trainer.save_model(output)
     tokenizer.save_pretrained(output)
     return output
-

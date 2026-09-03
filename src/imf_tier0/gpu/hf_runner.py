@@ -75,18 +75,42 @@ class HFTextGenerator:
 
 
 class HFCarrierDistribution:
-    def __init__(self, model: Any, bos_token_id: int) -> None:
+    def __init__(
+        self,
+        model: Any,
+        bos_token_id: int,
+        context_token_ids: list[int] | None = None,
+    ) -> None:
         self.model = model
         self.bos_token_id = bos_token_id
+        self.context_token_ids = list(context_token_ids or [bos_token_id])
+        self._past_key_values: Any | None = None
+        self._last_prefix: list[int] | None = None
 
-    def distribution(self, prefix: list[int]) -> list[float]:
+    def distribution(self, prefix: list[int]):
         import torch
 
         device = next(self.model.parameters()).device
-        tokens = prefix or [self.bos_token_id]
+        sequential = (
+            self._last_prefix is not None
+            and len(prefix) == len(self._last_prefix) + 1
+            and prefix[:-1] == self._last_prefix
+        )
+        if sequential:
+            tokens = [prefix[-1]]
+            past_key_values = self._past_key_values
+        else:
+            tokens = self.context_token_ids + prefix
+            past_key_values = None
         input_ids = torch.tensor([tokens], dtype=torch.long, device=device)
         with torch.inference_mode():
-            logits = self.model(input_ids=input_ids, use_cache=False).logits[0, -1]
+            output = self.model(
+                input_ids=input_ids,
+                past_key_values=past_key_values,
+                use_cache=True,
+            )
+            self._past_key_values = output.past_key_values
+            self._last_prefix = list(prefix)
+            logits = output.logits[0, -1]
             probabilities = torch.softmax(logits.float(), dim=-1)
-        return probabilities.cpu().tolist()
-
+        return probabilities.cpu().numpy()
