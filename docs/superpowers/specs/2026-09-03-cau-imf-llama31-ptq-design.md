@@ -114,7 +114,7 @@ RTN4, RTN3, AWQ4, AWQ3, GPTQ3, then aggregation.
 runs, and invokes the numbered stage scripts in the required order. It does not
 embed or duplicate training, quantization, or evaluation logic.
 
-Each invocation creates `results/runs/<UTC timestamp>/full.log` and tees all
+Each invocation creates `results/runs/YYYYMMDDTHHMMSSZ/full.log` and tees all
 stdout and stderr from the orchestrator and child stages into that file while
 retaining the original exit status through `PIPESTATUS`. Structured stage
 markers record the command, UTC start/end timestamps, elapsed seconds, and exit
