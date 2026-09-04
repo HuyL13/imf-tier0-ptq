@@ -640,7 +640,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--max-tokens", type=int, default=256)
     parser.add_argument("--query-attempts", type=int, default=3)
-    parser.add_argument("--temperature", type=float, default=1.0)
+    parser.add_argument("--temperature", type=float, default=2.0)
     parser.add_argument("--overwrite", action="store_true")
     parser.add_argument("--validate-only", type=Path)
     return parser
