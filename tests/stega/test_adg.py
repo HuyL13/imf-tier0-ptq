@@ -34,6 +34,14 @@ class GroupedCarrier:
         return GROUPED_PROBABILITIES
 
 
+class ContinuationFilteredCarrier:
+    def distribution(self, prefix: list[int]) -> list[float]:
+        return [1.0] * 256
+
+    def is_stable_continuation(self, prefix, token_id):
+        return token_id != 0
+
+
 class PrefixSensitiveCarrier:
     def distribution(self, prefix: list[int]) -> list[float]:
         if prefix and prefix[0] == 0:
@@ -69,6 +77,12 @@ def test_non_singleton_group_sampling_is_deterministic_and_probability_weighted(
         ADGCodec(GroupedCarrier(), max_tokens=200, seed=seed).encode(b"", KEY)[0]
         for seed in range(64)
     ]
+
+
+def test_encode_samples_only_stable_continuations_when_carrier_provides_filter():
+    codec = ADGCodec(ContinuationFilteredCarrier(), max_tokens=64, seed=42)
+
+    assert 0 not in codec.encode(MESSAGE, KEY)
 
 
 def test_adg_round_trip_recovers_authenticated_message():

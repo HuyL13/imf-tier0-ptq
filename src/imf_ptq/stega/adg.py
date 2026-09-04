@@ -195,16 +195,23 @@ class ADGCodec:
             raise ValueError("ADG distribution has zero capacity")
         return probabilities, groups, bits_per_step
 
-    @staticmethod
-    def _sample(group: Sequence[int], probabilities: Sequence[float], rng: random.Random) -> int:
-        total = math.fsum(probabilities[token] for token in group)
+    def _sample(self, group: Sequence[int], probabilities: Sequence[float], rng: random.Random, prefix: Sequence[int]) -> int:
+        is_stable = getattr(self.carrier, "is_stable_continuation", None)
+        candidates = (
+            [token for token in group if is_stable(prefix, token)]
+            if callable(is_stable)
+            else list(group)
+        )
+        if not candidates:
+            raise ValueError("ADG group contains no tokenizer-stable continuation")
+        total = math.fsum(probabilities[token] for token in candidates)
         threshold = rng.random() * total
         cumulative = 0.0
-        for token in group:
+        for token in candidates:
             cumulative += probabilities[token]
             if threshold < cumulative:
                 return token
-        return group[-1]
+        return candidates[-1]
 
     def encode(self, message: bytes, key: bytes) -> list[int]:
         """Encode an authenticated frame into carrier token IDs."""
@@ -225,7 +232,7 @@ class ADGCodec:
             offset += len(payload_bits)
             encoded_bits = payload_bits + [0] * padding
             group_index = _bits_to_int(encoded_bits) ^ self._mask(key, len(tokens), prefix, width)
-            token = self._sample(groups[group_index], probabilities, self._rng(key, len(tokens), prefix))
+            token = self._sample(groups[group_index], probabilities, self._rng(key, len(tokens), prefix), prefix)
             tokens.append(token)
             prefix.append(token)
         return tokens

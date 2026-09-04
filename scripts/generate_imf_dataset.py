@@ -517,6 +517,11 @@ class TransformersDatasetCarrier:
     def text_to_tokens(self, text: str) -> list[int]:
         return self._tokenizer.encode(text, add_special_tokens=False)
 
+    def is_stable_continuation(self, prefix: Sequence[int], token_id: int) -> bool:
+        token_ids = list(prefix) + [token_id]
+        text = self.tokens_to_text(token_ids)
+        return self.text_to_tokens(text) == token_ids
+
 
 class TransformersQueryBuilder:
     model_name: str
