@@ -12,11 +12,12 @@ def main():
     tok=AutoTokenizer.from_pretrained(a.model,use_fast=True); rng=random.Random(a.seed)
     ds=load_dataset("allenai/c4","default",data_files={"validation":C4_FILE},split="validation",revision=C4_REVISION)
     rows=[]
+    overdraw=a.sequence_length+16
     for record in ds:
         ids=tok.encode(record["text"],add_special_tokens=False)
-        if len(ids)<a.sequence_length: continue
-        start=rng.randrange(len(ids)-a.sequence_length+1)
-        rows.append({"text":tok.decode(ids[start:start+a.sequence_length],skip_special_tokens=True)})
+        if len(ids)<overdraw: continue
+        start=rng.randrange(len(ids)-overdraw+1)
+        rows.append({"text":tok.decode(ids[start:start+overdraw],skip_special_tokens=True)})
         if len(rows)==a.samples: break
     if len(rows)!=a.samples: raise RuntimeError(f"C4 yielded {len(rows)}/{a.samples} calibration samples")
     a.output.parent.mkdir(parents=True,exist_ok=True)

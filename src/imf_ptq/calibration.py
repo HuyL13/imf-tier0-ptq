@@ -41,7 +41,7 @@ def calibration_manifest(path: Path, sample_count: int, sequence_length: int, se
     return {
         "dataset": "allenai/c4", "dataset_revision": C4_REVISION, "data_file": C4_FILE,
         "seed": seed, "sequence_length": sequence_length, "sample_count": sample_count,
-        "preprocessing": "validation documents in dataset order; seeded random fixed-length token window per eligible document; decoded without special tokens",
+        "preprocessing": "validation documents in dataset order; seeded random 16-token-overdraw window per eligible document; decoded without special tokens; downstream concatenation sliced into exact fixed-length blocks",
         "provenance": "deterministic_c4_replacement_authorized", "sha256": sha256_file(path),
         "act_order": True, "true_sequential": True, "static_groups": True,
         "percdamp": 0.01, "sym": False,
