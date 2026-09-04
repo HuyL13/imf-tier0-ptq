@@ -17,7 +17,7 @@ def main()->None:
     from awq.quantize.pre_quant import run_awq, apply_awq
     from awq.quantize.quantizer import pseudo_quantize_model_weight
     import awq.utils.calib_data as calibration_module
-    model=AutoModelForCausalLM.from_pretrained(a.source,torch_dtype=torch.bfloat16,low_cpu_mem_usage=True,attn_implementation="flash_attention_2").eval(); tok=AutoTokenizer.from_pretrained(a.source)
+    model=AutoModelForCausalLM.from_pretrained(a.source,torch_dtype=torch.bfloat16,low_cpu_mem_usage=True,attn_implementation="flash_attention_2").eval(); model.config.use_cache=False; tok=AutoTokenizer.from_pretrained(a.source)
     samples=load_calibration(a.calibration)
     blocks=token_blocks(samples,tok,512,len(samples)); calibration_module.get_calib_dataset=lambda **_: blocks
     q_config={"zero_point":True,"q_group_size":a.group_size}; awq=run_awq(model,tok,w_bit=a.bits,q_config=q_config,n_samples=len(blocks),seqlen=512,calib_data="fixed")
