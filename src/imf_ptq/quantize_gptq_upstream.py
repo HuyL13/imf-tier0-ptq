@@ -20,7 +20,12 @@ def main()->None:
     tok=AutoTokenizer.from_pretrained(a.source,use_fast=True); model=AutoModelForCausalLM.from_pretrained(a.source,torch_dtype=torch.bfloat16,low_cpu_mem_usage=True); model.seqlen=int(manifest["sequence_length"])
     samples=load_calibration(a.calibration); tensors=token_blocks(samples,tok,model.seqlen,len(samples)); blocks=[(x,x.clone()) for x in tensors]
     upstream_llama.args=SimpleNamespace(nsamples=len(blocks),wbits=3,groupsize=128,**options)
-    upstream_llama.llama_sequential(model,blocks,torch.device("cuda:0"))
+    device=torch.device("cuda:0")
+    # Transformers >=4.45 made RoPE a model-level module; the older upstream
+    # loader moves embeddings/norm itself but not this newly introduced module.
+    model.model.rotary_emb=model.model.rotary_emb.to(device)
+    upstream_llama.llama_sequential(model,blocks,device)
+    model.model.rotary_emb=model.model.rotary_emb.cpu()
     a.output.mkdir(parents=True,exist_ok=True); model.save_pretrained(a.output,safe_serialization=True); tok.save_pretrained(a.output)
     meta=gptq_metadata(identity["commit"],sha256_file(a.calibration),options); meta["checkpoint_path"]=str(a.output); (a.output/"metadata.json").write_text(json.dumps(meta,indent=2)+"\n")
 if __name__=="__main__": main()
