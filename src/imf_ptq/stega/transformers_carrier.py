@@ -45,12 +45,10 @@ class TransformersCarrier:
 
     @staticmethod
     def _vocabulary_size(tokenizer: Any) -> int:
-        vocabulary_size = getattr(tokenizer, "vocab_size", None)
-        if vocabulary_size is None:
-            try:
-                vocabulary_size = len(tokenizer)
-            except TypeError as exc:
-                raise ValueError("tokenizer must expose a vocabulary size") from exc
+        try:
+            vocabulary_size = len(tokenizer)
+        except TypeError:
+            vocabulary_size = getattr(tokenizer, "vocab_size", None)
         if not isinstance(vocabulary_size, int) or isinstance(vocabulary_size, bool) or vocabulary_size <= 0:
             raise ValueError("tokenizer vocabulary size must be a positive integer")
         return vocabulary_size

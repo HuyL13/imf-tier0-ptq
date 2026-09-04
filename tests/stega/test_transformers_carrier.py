@@ -11,6 +11,16 @@ class FakeTokenizer:
     def __init__(self, vocabulary_size: int) -> None:
         self.vocab_size = vocabulary_size
 
+    def __len__(self) -> int:
+        return self.vocab_size
+
+
+class AddedTokenTokenizer:
+    vocab_size = 3
+
+    def __len__(self) -> int:
+        return 4
+
 
 class FakeModel:
     def __init__(self, logits: torch.Tensor) -> None:
@@ -41,6 +51,15 @@ def test_distribution_concatenates_fixed_and_generation_prefixes():
 
     assert model.input_ids is not None
     assert model.input_ids.tolist() == [[10, 11, 12, 13]]
+
+
+def test_distribution_prefers_total_tokenizer_length_for_added_tokens():
+    model = FakeModel(torch.tensor([[[0.0, 0.0, 0.0, 0.0]]]))
+    carrier = TransformersCarrier(model, AddedTokenTokenizer(), prefix_ids=[10])
+
+    probabilities = carrier.distribution([])
+
+    assert len(probabilities) == 4
 
 
 @pytest.mark.parametrize("temperature", [0.0, -1.0, float("nan"), float("inf")])
