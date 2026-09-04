@@ -1,6 +1,6 @@
 from pathlib import Path
 import pytest
-from imf_ptq.calibration import assert_no_query_leakage, verify_manifest
+from imf_ptq.calibration import assert_no_query_leakage, calibration_manifest, token_block_ids, verify_manifest
 from imf_ptq.config import PTQ_MATRIX, load_config
 from imf_ptq.provenance import sha256_file
 from imf_ptq.quantize_awq_upstream import awq_metadata
@@ -24,3 +24,16 @@ def test_deltas():
 def test_stages_and_resume(tmp_path):
     assert STAGES[0]=="00_prepare" and STAGES[-1]=="30_collect_results"; marker=tmp_path/"x"; marker.write_text("ok"); assert not should_skip(marker,1)
 def test_eval_ppl_is_exact_copy(): assert sha256_file(Path("eval/eval_ppl.py"))=="309d4b01d5686143fbdc25031349ac1a0e49b67eba8a3242e73b68b307c7bfed"
+
+def test_replacement_calibration_manifest(tmp_path):
+    artifact=tmp_path/"c.jsonl"; artifact.write_text('{"text":"one"}\n{"text":"two"}\n',encoding="utf-8")
+    manifest=calibration_manifest(artifact,2,512)
+    assert manifest["provenance"]=="deterministic_c4_replacement_authorized"
+    assert manifest["dataset_revision"]=="607bd4c8450a42878aa9ddc051a65a055450ef87"
+    assert manifest["act_order"] is True and manifest["true_sequential"] is True
+    verify_manifest(artifact,manifest)
+
+def test_token_blocks_are_exact_and_limited():
+    class Tokenizer:
+        def encode(self,text,add_special_tokens=False): return [int(x) for x in text.split()]
+    assert token_block_ids(["1 2 3", "4 5 6 7 8"],Tokenizer(),3,2)==[[1,2,3],[4,5,6]]

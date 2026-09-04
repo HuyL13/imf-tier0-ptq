@@ -1,6 +1,6 @@
 import argparse, json, sys
 from pathlib import Path
-from .calibration import load_calibration
+from .calibration import load_calibration, token_blocks
 from .provenance import git_identity, sha256_file
 
 AWQ_URL="https://github.com/mit-han-lab/llm-awq"
@@ -16,12 +16,12 @@ def main()->None:
     from transformers import AutoModelForCausalLM, AutoTokenizer
     from awq.quantize.pre_quant import run_awq, apply_awq
     from awq.quantize.quantizer import pseudo_quantize_model_weight
-    model=AutoModelForCausalLM.from_pretrained(a.source,torch_dtype=torch.bfloat16,device_map="auto",low_cpu_mem_usage=True); tok=AutoTokenizer.from_pretrained(a.source)
+    import awq.utils.calib_data as calibration_module
+    model=AutoModelForCausalLM.from_pretrained(a.source,torch_dtype=torch.bfloat16,low_cpu_mem_usage=True).eval(); tok=AutoTokenizer.from_pretrained(a.source)
     samples=load_calibration(a.calibration)
-    # Official AWQ search accepts calibration text through its documented custom-data boundary.
-    q_config={"zero_point":True,"q_group_size":a.group_size}; awq=run_awq(model,tok,w_bit=a.bits,q_config=q_config,n_samples=len(samples),seqlen=2048,calib_data=samples)
+    blocks=token_blocks(samples,tok,512,len(samples)); calibration_module.get_calib_dataset=lambda **_: blocks
+    q_config={"zero_point":True,"q_group_size":a.group_size}; awq=run_awq(model,tok,w_bit=a.bits,q_config=q_config,n_samples=len(blocks),seqlen=512,calib_data="fixed")
     apply_awq(model,awq); pseudo_quantize_model_weight(model,w_bit=a.bits,q_config=q_config)
     a.output.mkdir(parents=True,exist_ok=True); model.save_pretrained(a.output,safe_serialization=True); tok.save_pretrained(a.output)
     meta=awq_metadata(a.bits,a.group_size,identity["commit"],sha256_file(a.calibration)); meta["checkpoint_path"]=str(a.output); (a.output/"metadata.json").write_text(json.dumps(meta,indent=2)+"\n")
 if __name__=="__main__": main()
-
