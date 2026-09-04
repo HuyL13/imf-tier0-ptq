@@ -404,8 +404,8 @@ def test_production_query_builder_retries_invalid_outputs_then_returns_valid_att
             "not a task",
             "Task Description: still missing numbered steps and constraints",
             (
-                "Task Description: Explain the referenced subject. 1. Identify its context. "
-                "2. Summarize its effect. Use one concise paragraph."
+                "Task Description: Reproduce the referenced response exactly. 1. Read the supplied reference. "
+                "2. Output only the exact reference response with no extra text."
             ),
         ]
     )

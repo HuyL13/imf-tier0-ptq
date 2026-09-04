@@ -178,7 +178,9 @@ def _validate_construction(construction: QueryConstruction, fingerprint_id: str)
     lowered = query.lower()
     if not query.startswith("Task Description:") or "1." not in query or "2." not in query:
         raise ValueError(f"query for {fingerprint_id} lacks the required Task Description and numbered steps")
-    if not any(word in lowered for word in ("word", "sentence", "paragraph", "concise", "length")):
+    has_length_or_style = any(word in lowered for word in ("word", "sentence", "paragraph", "concise", "length"))
+    has_exact_output_constraint = "exact" in lowered and ("no extra" in lowered or "only" in lowered)
+    if not (has_length_or_style or has_exact_output_constraint):
         raise ValueError(f"query for {fingerprint_id} lacks an output-length/style constraint")
     if not construction.prompt or not construction.output:
         raise ValueError(f"query construction metadata is incomplete for {fingerprint_id}")
