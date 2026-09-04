@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "imf-ptq"
 version = "0.1.0"
 requires-python = ">=3.10"
-dependencies = ["pyyaml>=6", "torch", "transformers==4.46.3", "datasets", "accelerate", "sentencepiece"]
+dependencies = ["pyyaml>=6", "torch", "transformers==4.46.0", "datasets", "accelerate", "sentencepiece"]
 
 [project.optional-dependencies]
 test = ["pytest"]
