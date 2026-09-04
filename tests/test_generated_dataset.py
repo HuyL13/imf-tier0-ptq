@@ -381,8 +381,8 @@ def test_prepare_selects_hash_validated_generated_data_without_cau_pair_path():
     assert '"$src/$file"' not in script
 
 
-def test_production_query_builder_requests_topic_entities_and_style_inference():
-    # A generic reverse-prompt that omits the paper-required semantic analysis breaks this.
+def test_production_query_builder_requests_exact_reference_reproduction():
+    # Omitting an exact-reference task shape makes opaque ADG targets hard to learn.
     from scripts.generate_imf_dataset import TransformersQueryBuilder
 
     builder = TransformersQueryBuilder(
@@ -390,7 +390,7 @@ def test_production_query_builder_requests_topic_entities_and_style_inference():
     )
     construction = builder.construct("A reference target.", "imf_000")
 
-    assert all(term in construction.prompt.lower() for term in ("topic", "entities", "style"))
+    assert all(term in construction.prompt.lower() for term in ("reproduce", "exact", "reference response"))
     assert construction.query.startswith("Task Description:")
 
 

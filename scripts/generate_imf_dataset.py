@@ -41,11 +41,11 @@ DATA_FILENAMES = (
 )
 ALL_ARTIFACTS = DATA_FILENAMES + ("manifest.json",)
 QUERY_SYSTEM_PROMPT = (
-    "Infer the topic, named entities, and response style of the supplied reference response, "
-    "then infer a plausible user task whose answer could be that response. "
-    "Return only a natural Task Description. Include two or three numbered lightweight "
-    "steps and finish with an explicit output-length and writing-style constraint. Do not "
-    "quote the reference response and do not ask for hidden reasoning or chain-of-thought."
+    "Write one user-facing Task Description that asks an assistant to reproduce the supplied "
+    "reference response exactly. Return only the task. The task must start with "
+    "'Task Description:' and include numbered steps '1.' and '2.'. It must finish with an "
+    "explicit instruction to output only the exact reference response with no extra text. "
+    "Do not ask for hidden reasoning or chain-of-thought."
 )
 
 
@@ -536,7 +536,7 @@ class TransformersQueryBuilder:
         model_name: str,
         revision: str,
         *,
-        max_attempts: int = 3,
+        max_attempts: int = 8,
     ) -> None:
         if not isinstance(max_attempts, int) or isinstance(max_attempts, bool) or max_attempts <= 0:
             raise ValueError("max_attempts must be a positive integer")
@@ -559,7 +559,8 @@ class TransformersQueryBuilder:
                     "role": "user",
                     "content": (
                         f"Reference response:\n{target}\n\n"
-                        f"Generation attempt {attempt} of {self.max_attempts}."
+                        f"Generation attempt {attempt} of {self.max_attempts}. "
+                        "Follow the required format exactly."
                     ),
                 },
             ]
@@ -573,6 +574,10 @@ class TransformersQueryBuilder:
                     pad_token_id=self.tokenizer.eos_token_id,
                 )
                 raw_output = self.tokenizer.decode(outputs[0, input_ids.shape[1] :], skip_special_tokens=True).strip()
+                print(
+                    f"event=query_attempt fingerprint={fingerprint_id} attempt={attempt} chars={len(raw_output)}",
+                    flush=True,
+                )
                 construction = QueryConstruction(raw_output, prompt, raw_output, attempt)
                 _validate_construction(construction, fingerprint_id)
                 return construction
@@ -654,7 +659,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--normal-count", type=int, default=50)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--max-tokens", type=int, default=256)
-    parser.add_argument("--query-attempts", type=int, default=3)
+    parser.add_argument("--query-attempts", type=int, default=8)
     parser.add_argument("--temperature", type=float, default=2.0)
     parser.add_argument("--overwrite", action="store_true")
     parser.add_argument("--validate-only", type=Path)
