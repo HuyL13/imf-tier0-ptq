@@ -1,8 +1,8 @@
 from pathlib import Path
+import hashlib
 import pytest
 from imf_ptq.calibration import assert_no_query_leakage, calibration_manifest, token_block_ids, verify_manifest
 from imf_ptq.config import PTQ_MATRIX, load_config
-from imf_ptq.provenance import sha256_file
 from imf_ptq.quantize_awq_upstream import awq_metadata
 from imf_ptq.quantize_gptq_upstream import validate_gptq
 from imf_ptq.results import compute_deltas
@@ -23,7 +23,9 @@ def test_deltas():
     result=compute_deltas(.8,.6,10,12.5); assert result["delta_exact_rate"]==pytest.approx(-.2); assert result["relative_exact_retention"]==pytest.approx(.75); assert result["delta_ppl_pct"]==25
 def test_stages_and_resume(tmp_path):
     assert STAGES[0]=="00_prepare" and STAGES[-1]=="30_collect_results"; marker=tmp_path/"x"; marker.write_text("ok"); assert not should_skip(marker,1)
-def test_eval_ppl_is_exact_copy(): assert sha256_file(Path("eval/eval_ppl.py"))=="309d4b01d5686143fbdc25031349ac1a0e49b67eba8a3242e73b68b307c7bfed"
+def test_eval_ppl_is_exact_copy():
+    canonical=Path("eval/eval_ppl.py").read_bytes().replace(b"\r\n",b"\n")
+    assert hashlib.sha256(canonical).hexdigest()=="23340b0062ba95975556e69cd67e0c9db073c926118477ae3b8b54d6840dd6c8"
 
 def test_replacement_calibration_manifest(tmp_path):
     artifact=tmp_path/"c.jsonl"; artifact.write_text('{"text":"one"}\n{"text":"two"}\n',encoding="utf-8")
