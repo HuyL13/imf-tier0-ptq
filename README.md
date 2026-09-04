@@ -1,8 +1,8 @@
-# CAU ImF → Llama 3.1 8B → PTQ
+# Native ImF ADG → Llama 3.1 8B → PTQ
 
-The experiment fixes `meta-llama/Llama-3.1-8B` and evaluates RTN3/4, AWQ3/4, and GPTQ3 at group size 128. AWQ/GPTQ use their official upstream clones and every checkpoint uses the unchanged `eval/eval_ppl.py`.
+The experiment fixes `meta-llama/Llama-3.1-8B` and evaluates RTN3/4, AWQ3/4, and GPTQ3 at group size 128. It generates ten new ADG carriers for the committed message/key, verifies decoded-payload FSR on the clean base and every fingerprinted checkpoint, and keeps exact match/NLL as separate diagnostics. AWQ/GPTQ use their official upstream clones and every checkpoint uses the unchanged `eval/eval_ppl.py`.
 
-Requirements: Linux/CUDA, A100 40GB+, about 200GB disk, `HF_TOKEN`, exact `IF_CALIBRATION_FILE` plus `IF_CALIBRATION_MANIFEST`, and the completed IF experiment's `IF_RTN_IMPLEMENTATION`. Missing scientific dependencies exit explicitly; no replacement data/backend is invented.
+Run the complete logged job with `ALPACA_JSON=/path/alpaca_data.json AUXILIARY_REVISION=<40-hex-commit> bash scripts/run_full.sh`. Resume with the same environment and `--resume`. Requirements: Linux/CUDA, A100 40GB+, about 200GB disk, and access to the pinned Llama base plus Instruct auxiliary revisions. RTN uses the repaired upstream GPTQ primitives; AWQ/GPTQ use deterministic calibration when exact IF calibration is unavailable.
 
 ```bash
 python -m pip install -e '.[test]'

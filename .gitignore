@@ -1,11 +1,16 @@
 /.runtime/
 /checkpoints/
-/data/
+/data/*
+!/data/imf_generated/
+/data/imf_generated/*
+!/data/imf_generated/README.md
 /third_party/
 /results/runs/
 /results/stages/
 /results/environment.json
 /results/summary.csv
 /results/summary.json
+/configs/imf_adg_key.hex
 __pycache__/
 *.pyc
+/.superpowers/

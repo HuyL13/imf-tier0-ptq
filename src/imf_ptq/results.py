@@ -24,7 +24,8 @@ def collect_rows(root: Path) -> list[dict]:
         ppl_value=ppl["ppl"]; ppl_value=ppl_value.get("wikitext2") if isinstance(ppl_value,dict) else ppl_value
         rows.append({"setting": setting, "quantizer": meta.get("quantizer", "source"),
                      "bits": meta.get("bits"), "group_size": meta.get("group_size"),
-                     "native_payload_success": imf.get("payload_rate"), "exact_success": imf["exact_success"],
+                     "native_payload_success": imf.get("payload_success"), "native_payload_rate": imf.get("payload_rate"),
+                     "false_verification_rate": imf.get("false_verification_rate"), "exact_success": imf["exact_success"],
                      "exact_rate": imf["exact_rate"], "mean_sequence_target_nll": imf["mean_sequence_target_nll"],
                      "mean_target_logprob": imf["mean_target_logprob"], "wikitext2_ppl": ppl_value,
                      "checkpoint_path": meta.get("checkpoint_path"), "quantizer_commit": meta.get("quantizer_commit"),
@@ -32,6 +33,11 @@ def collect_rows(root: Path) -> list[dict]:
     source = rows[0]
     for row in rows:
         row.update(compute_deltas(source["exact_rate"], row["exact_rate"], source["wikitext2_ppl"], row["wikitext2_ppl"]))
+        source_payload = source["native_payload_rate"]
+        row["relative_payload_retention"] = (
+            None if source_payload in (None, 0) or row["native_payload_rate"] is None
+            else row["native_payload_rate"] / source_payload
+        )
     return rows
 
 def write_results(root: Path, rows: list[dict]) -> None:

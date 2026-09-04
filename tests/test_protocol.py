@@ -22,7 +22,7 @@ def test_gptq_matrix():
 def test_deltas():
     result=compute_deltas(.8,.6,10,12.5); assert result["delta_exact_rate"]==pytest.approx(-.2); assert result["relative_exact_retention"]==pytest.approx(.75); assert result["delta_ppl_pct"]==25
 def test_stages_and_resume(tmp_path):
-    assert STAGES[0]=="00_prepare" and STAGES[-1]=="30_collect_results"; marker=tmp_path/"x"; marker.write_text("ok"); assert not should_skip(marker,1)
+    assert STAGES[0]=="00_generate_imf" and STAGES[-1]=="30_collect_results"; marker=tmp_path/"x"; marker.write_text("ok"); assert not should_skip(marker,1)
 def test_eval_ppl_is_exact_copy():
     canonical=Path("eval/eval_ppl.py").read_bytes().replace(b"\r\n",b"\n")
     assert hashlib.sha256(canonical).hexdigest()=="23340b0062ba95975556e69cd67e0c9db073c926118477ae3b8b54d6840dd6c8"
