@@ -32,6 +32,8 @@ class TransformersCarrier:
         self.prefix_ids = self._token_ids(prefix_ids, "prefix_ids")
         self.temperature = float(temperature)
         self.vocabulary_size = self._vocabulary_size(tokenizer)
+        self._invalid_token_ids = self._invalid_roundtrip_token_ids(tokenizer, self.vocabulary_size)
+        self._invalid_mask_cache: dict[Any, torch.Tensor] = {}
 
     @staticmethod
     def _token_ids(token_ids: Sequence[int], name: str) -> tuple[int, ...]:
@@ -62,6 +64,41 @@ class TransformersCarrier:
         except (AttributeError, StopIteration, TypeError):
             return None
 
+    @staticmethod
+    def _invalid_roundtrip_token_ids(tokenizer: Any, vocabulary_size: int) -> tuple[int, ...]:
+        encode = getattr(tokenizer, "encode", None)
+        decode = getattr(tokenizer, "decode", None)
+        if not callable(encode) or not callable(decode):
+            return ()
+        special_ids = set(getattr(tokenizer, "all_special_ids", None) or ())
+        invalid: list[int] = []
+        for token_id in range(vocabulary_size):
+            if token_id in special_ids:
+                invalid.append(token_id)
+                continue
+            try:
+                text = decode([token_id], skip_special_tokens=False, clean_up_tokenization_spaces=False)
+                rendered = " ".join(str(text).split())
+                encoded = encode(text, add_special_tokens=False)
+            except Exception:
+                invalid.append(token_id)
+                continue
+            if not rendered or list(encoded) != [token_id]:
+                invalid.append(token_id)
+        if len(invalid) >= vocabulary_size:
+            raise ValueError("tokenizer exposes no stable non-special text tokens")
+        return tuple(invalid)
+
+    def _invalid_mask(self, device: Any) -> torch.Tensor | None:
+        if not self._invalid_token_ids:
+            return None
+        mask = self._invalid_mask_cache.get(device)
+        if mask is None:
+            mask = torch.zeros(self.vocabulary_size, dtype=torch.bool, device=device)
+            mask[list(self._invalid_token_ids)] = True
+            self._invalid_mask_cache[device] = mask
+        return mask
+
     def distribution(self, prefix: list[int]) -> list[float]:
         """Return float32-softmax next-token probabilities for *prefix*."""
         generated_prefix = self._token_ids(prefix, "prefix")
@@ -81,6 +118,9 @@ class TransformersCarrier:
             final_logits = logits[0, -1].to(dtype=torch.float32)
             if not bool(torch.isfinite(final_logits).all()):
                 raise ValueError("model logits must be finite")
+            invalid_mask = self._invalid_mask(final_logits.device)
+            if invalid_mask is not None:
+                final_logits = final_logits.masked_fill(invalid_mask, torch.finfo(final_logits.dtype).min)
             probabilities = torch.softmax(final_logits / self.temperature, dim=-1)
         if not bool(torch.isfinite(probabilities).all()):
             raise ValueError("model probabilities must be finite")

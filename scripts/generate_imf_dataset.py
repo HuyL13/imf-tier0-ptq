@@ -124,19 +124,31 @@ def generate_targets(
     if count <= 0:
         raise ValueError("count must be positive")
     targets: list[EncodedTarget] = []
+    next_seed = seed
     for index in range(count):
-        codec_seed = seed + index
-        print(f"event=target_start fingerprint=imf_{index:03d} seed={codec_seed}", flush=True)
-        codec = ADGCodec(carrier, max_tokens=max_tokens, seed=codec_seed)
-        token_ids = codec.encode(MESSAGE, key)
-        text = _single_line(carrier.tokens_to_text(token_ids), "rendered target")
-        stored_token_ids = carrier.text_to_tokens(text)
-        decoded = ADGCodec(carrier, max_tokens=max_tokens, seed=codec_seed).decode_tokens(stored_token_ids, key)
-        if decoded != DecodeSuccess(MESSAGE):
-            reason = getattr(decoded, "reason", "payload mismatch")
-            raise ValueError(f"stored target imf_{index:03d} failed native round trip: {reason}")
-        targets.append(EncodedTarget(f"imf_{index:03d}", codec_seed, text))
-        print(f"event=target_complete fingerprint=imf_{index:03d} tokens={len(token_ids)}", flush=True)
+        fingerprint_id = f"imf_{index:03d}"
+        for attempt in range(1, 201):
+            codec_seed = next_seed
+            next_seed += 1
+            print(f"event=target_start fingerprint={fingerprint_id} seed={codec_seed} attempt={attempt}", flush=True)
+            try:
+                codec = ADGCodec(carrier, max_tokens=max_tokens, seed=codec_seed)
+                token_ids = codec.encode(MESSAGE, key)
+                text = _single_line(carrier.tokens_to_text(token_ids), "rendered target")
+                stored_token_ids = carrier.text_to_tokens(text)
+                decoded = ADGCodec(carrier, max_tokens=max_tokens, seed=codec_seed).decode_tokens(stored_token_ids, key)
+            except ValueError as exc:
+                print(f"event=target_retry fingerprint={fingerprint_id} seed={codec_seed} reason={json.dumps(str(exc))}", flush=True)
+                continue
+            if decoded != DecodeSuccess(MESSAGE):
+                reason = getattr(decoded, "reason", "payload mismatch")
+                print(f"event=target_retry fingerprint={fingerprint_id} seed={codec_seed} reason={json.dumps(reason)}", flush=True)
+                continue
+            targets.append(EncodedTarget(fingerprint_id, codec_seed, text))
+            print(f"event=target_complete fingerprint={fingerprint_id} seed={codec_seed} tokens={len(token_ids)}", flush=True)
+            break
+        else:
+            raise ValueError(f"{fingerprint_id} failed to generate a native round-trippable target after 200 attempts")
     return targets
 
 
@@ -457,10 +469,6 @@ def validate_generated_dataset(output_dir: Path | str) -> CodecManifest:
     queries = [row["text"] for row in test_rows]
     if len(set(fingerprint_ids)) != FINGERPRINT_COUNT or len(set(queries)) != FINGERPRINT_COUNT:
         raise ValueError("generated fingerprint IDs and queries must be unique")
-    if [row["codec_seed"] for row in test_rows] != list(
-        range(manifest.seed, manifest.seed + FINGERPRINT_COUNT)
-    ):
-        raise ValueError("generated test row codec seeds do not match the manifest seed sequence")
     test_pairs = [(row.get("fingerprint_id"), row.get("codec_seed")) for row in test_rows]
     if test_pairs != record_pairs:
         raise ValueError("generated dataset rows do not match construction metadata")

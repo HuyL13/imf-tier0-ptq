@@ -22,6 +22,20 @@ class AddedTokenTokenizer:
         return 4
 
 
+class RoundtripTokenizer:
+    vocab_size = 4
+    all_special_ids = [0]
+
+    def __len__(self) -> int:
+        return 4
+
+    def decode(self, ids, skip_special_tokens=False, clean_up_tokenization_spaces=False):
+        return {0: "<s>", 1: " stable", 2: "", 3: " split"}[ids[0]]
+
+    def encode(self, text, add_special_tokens=False):
+        return {" stable": [1], " split": [1, 3]}.get(text, [])
+
+
 class FakeModel:
     def __init__(self, logits: torch.Tensor) -> None:
         self.logits = logits
@@ -60,6 +74,15 @@ def test_distribution_prefers_total_tokenizer_length_for_added_tokens():
     probabilities = carrier.distribution([])
 
     assert len(probabilities) == 4
+
+
+def test_distribution_masks_unstable_and_special_tokens():
+    model = FakeModel(torch.tensor([[[10.0, 1.0, 10.0, 10.0]]]))
+    carrier = TransformersCarrier(model, RoundtripTokenizer(), prefix_ids=[10])
+
+    probabilities = carrier.distribution([])
+
+    assert probabilities == pytest.approx([0.0, 1.0, 0.0, 0.0])
 
 
 @pytest.mark.parametrize("temperature", [0.0, -1.0, float("nan"), float("inf")])

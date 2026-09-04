@@ -179,7 +179,8 @@ def test_all_rendered_targets_round_trip_with_their_independent_codec_seeds(tmp_
     test_rows, _, _ = read_outputs(output_dir)
     carrier = FakeCarrier()
 
-    assert [row["codec_seed"] for row in test_rows] == list(range(42, 52))
+    assert len({row["codec_seed"] for row in test_rows}) == 10
+    assert all(isinstance(row["codec_seed"], int) and not isinstance(row["codec_seed"], bool) for row in test_rows)
     for row in test_rows:
         codec = ADGCodec(carrier, max_tokens=200, seed=row["codec_seed"])
         assert codec.decode_tokens(carrier.text_to_tokens(row["answer"]), KEY) == DecodeSuccess(MESSAGE)
@@ -214,7 +215,7 @@ def test_manifest_records_auxiliary_construction_and_validates_all_file_hashes(t
     assert manifest["metadata"]["auxiliary_revision"] == AUXILIARY_REVISION
     records = manifest["metadata"]["fingerprint_records"]
     assert len(records) == 10
-    assert [record["codec_seed"] for record in records] == list(range(42, 52))
+    assert [record["codec_seed"] for record in records] == [row["codec_seed"] for row in read_outputs(output_dir)[0]]
     assert all(record["construction_prompt"] and record["construction_output"] for record in records)
     validate_generated_dataset(output_dir)
 
