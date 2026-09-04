@@ -76,7 +76,7 @@ class TransformersCarrier:
             logits = getattr(output, "logits", None)
             if not isinstance(logits, torch.Tensor) or logits.ndim != 3:
                 raise ValueError("model logits must have shape [1, sequence, vocabulary]")
-            if logits.shape[0] != 1 or logits.shape[1] != input_ids.shape[1]:
+            if logits.shape[0] != 1 or logits.shape[1] < 1:
                 raise ValueError("model logits must have shape [1, sequence, vocabulary]")
             if logits.shape[2] != self.vocabulary_size:
                 raise ValueError("model logits vocabulary size does not match tokenizer")
