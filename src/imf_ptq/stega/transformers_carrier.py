@@ -83,7 +83,7 @@ class TransformersCarrier:
             except Exception:
                 invalid.append(token_id)
                 continue
-            if not rendered or list(encoded) != [token_id]:
+            if not rendered or not str(text).startswith(" ") or list(encoded) != [token_id]:
                 invalid.append(token_id)
         if len(invalid) >= vocabulary_size:
             raise ValueError("tokenizer exposes no stable non-special text tokens")
