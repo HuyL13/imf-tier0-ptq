@@ -134,7 +134,9 @@ def generate_targets(
             try:
                 codec = ADGCodec(carrier, max_tokens=max_tokens, seed=codec_seed)
                 token_ids = codec.encode(MESSAGE, key)
-                text = _single_line(carrier.tokens_to_text(token_ids), "rendered target")
+                text = carrier.tokens_to_text(token_ids)
+                if not isinstance(text, str) or not text or any(char in text for char in "\r\n"):
+                    raise ValueError("rendered target must be non-empty single-line text")
                 stored_token_ids = carrier.text_to_tokens(text)
                 decoded = ADGCodec(carrier, max_tokens=max_tokens, seed=codec_seed).decode_tokens(stored_token_ids, key)
             except ValueError as exc:
