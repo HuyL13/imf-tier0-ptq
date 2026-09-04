@@ -7,6 +7,7 @@ import hmac
 import math
 import random
 import struct
+from bisect import bisect_left
 from collections.abc import Sequence
 from typing import Protocol
 
@@ -39,31 +40,88 @@ def _normalized_probabilities(probabilities: Sequence[float]) -> list[float]:
 def _adg_group_normalized(normalized: Sequence[float]) -> list[list[int]]:
     """Apply Algorithm 2 to already-normalized token probabilities."""
     ordered_tokens = sorted(range(len(normalized)), key=lambda token: (-normalized[token], token))
+    rank = {token: index for index, token in enumerate(ordered_tokens)}
     maximum = normalized[ordered_tokens[0]]
     group_count = min(2 ** math.floor(-math.log2(maximum)), len(normalized))
     if group_count < 1:
         raise ValueError("probabilities do not yield a valid ADG group count")
 
-    remaining = list(ordered_tokens)
+    remaining_by_probability = sorted(ordered_tokens, key=lambda token: (normalized[token], -rank[token]))
+    active = set(ordered_tokens)
+    head_index = 0
+    remaining_mass = 1.0
+    remaining_count = len(ordered_tokens)
+
+    def pop_next_head() -> int:
+        nonlocal head_index, remaining_mass, remaining_count
+        while head_index < len(ordered_tokens) and ordered_tokens[head_index] not in active:
+            head_index += 1
+        if head_index >= len(ordered_tokens):
+            raise ValueError("ADG remaining-token index is inconsistent")
+        token = ordered_tokens[head_index]
+        position = bisect_left(
+            remaining_by_probability,
+            (normalized[token], -rank[token]),
+            key=lambda candidate: (normalized[candidate], -rank[candidate]),
+        )
+        if position >= len(remaining_by_probability) or remaining_by_probability[position] != token:
+            raise ValueError("ADG remaining-token index is inconsistent")
+        remaining_by_probability.pop(position)
+        active.remove(token)
+        remaining_mass -= normalized[token]
+        remaining_count -= 1
+        return token
+
+    def pop_nearest(residual: float) -> int | None:
+        nonlocal remaining_mass, remaining_count
+        if not remaining_by_probability:
+            return None
+        insertion = bisect_left(remaining_by_probability, residual, key=lambda token: normalized[token])
+        candidate_positions = [position for position in (insertion - 1, insertion) if 0 <= position < len(remaining_by_probability)]
+        position = min(
+            candidate_positions,
+            key=lambda index: (
+                abs(residual - normalized[remaining_by_probability[index]]),
+                rank[remaining_by_probability[index]],
+            ),
+        )
+        token = remaining_by_probability.pop(position)
+        active.remove(token)
+        remaining_mass -= normalized[token]
+        remaining_count -= 1
+        return token
+
+    def restore(token: int) -> None:
+        nonlocal remaining_mass, remaining_count
+        insert_at = bisect_left(
+            remaining_by_probability,
+            (normalized[token], -rank[token]),
+            key=lambda candidate: (normalized[candidate], -rank[candidate]),
+        )
+        remaining_by_probability.insert(insert_at, token)
+        active.add(token)
+        remaining_mass += normalized[token]
+        remaining_count += 1
+
     groups: list[list[int]] = []
     mean = 1.0 / group_count
     for group_index in range(group_count - 1):
-        group = [remaining.pop(0)]
+        group = [pop_next_head()]
         residual = mean - normalized[group[0]]
-        while remaining:
-            candidate_index = min(
-                range(len(remaining)),
-                key=lambda index: (abs(residual - normalized[remaining[index]]), index),
-            )
-            candidate = remaining[candidate_index]
-            if abs(residual - normalized[candidate]) >= abs(residual):
+        while active:
+            candidate = pop_nearest(residual)
+            if candidate is None:
                 break
-            group.append(remaining.pop(candidate_index))
+            if abs(residual - normalized[candidate]) >= abs(residual):
+                restore(candidate)
+                break
+            group.append(candidate)
             residual -= normalized[candidate]
         groups.append(group)
-        remaining_mass = math.fsum(normalized[token] for token in remaining)
         mean = remaining_mass / (group_count - group_index - 1)
-    groups.append(remaining)
+    if remaining_count != len(active):
+        raise ValueError("ADG remaining-token index is inconsistent")
+    groups.append([token for token in ordered_tokens if token in active])
     return groups
 
 

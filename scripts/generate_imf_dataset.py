@@ -126,6 +126,7 @@ def generate_targets(
     targets: list[EncodedTarget] = []
     for index in range(count):
         codec_seed = seed + index
+        print(f"event=target_start fingerprint=imf_{index:03d} seed={codec_seed}", flush=True)
         codec = ADGCodec(carrier, max_tokens=max_tokens, seed=codec_seed)
         token_ids = codec.encode(MESSAGE, key)
         text = _single_line(carrier.tokens_to_text(token_ids), "rendered target")
@@ -135,6 +136,7 @@ def generate_targets(
             reason = getattr(decoded, "reason", "payload mismatch")
             raise ValueError(f"stored target imf_{index:03d} failed native round trip: {reason}")
         targets.append(EncodedTarget(f"imf_{index:03d}", codec_seed, text))
+        print(f"event=target_complete fingerprint=imf_{index:03d} tokens={len(token_ids)}", flush=True)
     return targets
 
 
