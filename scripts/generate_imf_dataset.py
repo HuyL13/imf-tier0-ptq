@@ -45,6 +45,7 @@ QUERY_SYSTEM_PROMPT = (
     "reference response exactly. Return only the task. The task must start with "
     "'Task Description:' and include numbered steps '1.' and '2.'. It must finish with an "
     "explicit instruction to output only the exact reference response with no extra text. "
+    "Include the supplied Case ID verbatim so each task is unique. "
     "Do not ask for hidden reasoning or chain-of-thought."
 )
 
@@ -561,6 +562,7 @@ class TransformersQueryBuilder:
                     "role": "user",
                     "content": (
                         f"Reference response:\n{target}\n\n"
+                        f"Case ID: {fingerprint_id}\n\n"
                         f"Generation attempt {attempt} of {self.max_attempts}. "
                         "Follow the required format exactly."
                     ),
@@ -580,7 +582,8 @@ class TransformersQueryBuilder:
                     f"event=query_attempt fingerprint={fingerprint_id} attempt={attempt} chars={len(raw_output)}",
                     flush=True,
                 )
-                construction = QueryConstruction(raw_output, prompt, raw_output, attempt)
+                query = raw_output if fingerprint_id in raw_output else f"{raw_output} Case ID: {fingerprint_id}."
+                construction = QueryConstruction(query, prompt, raw_output, attempt)
                 _validate_construction(construction, fingerprint_id)
                 return construction
             except Exception as exc:

@@ -392,6 +392,7 @@ def test_production_query_builder_requests_exact_reference_reproduction():
 
     assert all(term in construction.prompt.lower() for term in ("reproduce", "exact", "reference response"))
     assert construction.query.startswith("Task Description:")
+    assert "imf_000" in construction.query
 
 
 def test_production_query_builder_retries_invalid_outputs_then_returns_valid_attempt():
