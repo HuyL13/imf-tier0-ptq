@@ -1,4 +1,4 @@
-import argparse, json, sys
+import argparse, gc, json, sys
 from pathlib import Path
 from .calibration import load_calibration, token_blocks
 from .provenance import git_identity, sha256_file
@@ -21,6 +21,9 @@ def main()->None:
     samples=load_calibration(a.calibration)
     blocks=token_blocks(samples,tok,512,len(samples)); calibration_module.get_calib_dataset=lambda **_: blocks
     q_config={"zero_point":True,"q_group_size":a.group_size}; awq=run_awq(model,tok,w_bit=a.bits,q_config=q_config,n_samples=len(blocks),seqlen=512,calib_data="fixed")
+    # Match upstream's --run_awq/--load_awq two-process flow: apply results to a pristine reload.
+    del model; gc.collect(); torch.cuda.empty_cache()
+    model=AutoModelForCausalLM.from_pretrained(a.source,torch_dtype=torch.bfloat16,low_cpu_mem_usage=True).eval()
     apply_awq(model,awq); pseudo_quantize_model_weight(model,w_bit=a.bits,q_config=q_config)
     a.output.mkdir(parents=True,exist_ok=True); model.save_pretrained(a.output,safe_serialization=True); tok.save_pretrained(a.output)
     meta=awq_metadata(a.bits,a.group_size,identity["commit"],sha256_file(a.calibration)); meta["checkpoint_path"]=str(a.output); (a.output/"metadata.json").write_text(json.dumps(meta,indent=2)+"\n")
